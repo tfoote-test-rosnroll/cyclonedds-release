@@ -1,0 +1,203 @@
+language: c
+
+# Coverity Scan can be configured through Travis addons, but this allows for
+# more control over the build instructions and does not require the addition
+# of a coverity_scan branch in the repository. travisci_build_coverity_scan.sh
+# does more checks before it decides to download Coverity (around 500M), but
+# these instructions assume Coverity Scan is not installed if the directory
+# does not exist and expects the download to fail if the token is incorrect.
+# Coverity Scan quota are not checked as the Coverity enabled build must only
+# run from cron.
+install_coverity: &install_coverity
+  if [ "${COVERITY_SCAN}" = "true" ]; then
+    COV_DIR="/tmp/coverity-scan-analysis";
+    COV_ARC="/tmp/cov-analysis-${COV_PLATFORM}.tgz";
+    test ! -d "${COV_DIR}" &&
+      mkdir -p "${COV_DIR}" &&
+      curl -s -S -F project="${TRAVIS_REPO_SLUG}"
+                 -F token="${COVERITY_SCAN_TOKEN}"
+                 -o "${COV_ARC}"
+                 "https://scan.coverity.com/download/cxx/${COV_PLATFORM}" &&
+      tar -xzf "${COV_ARC}" -C "${COV_DIR}";
+    COV_ANALYSIS=$(find "${COV_DIR}" -type d -name "cov-analysis*");
+    eval "export PATH=\"${PATH}:${COV_ANALYSIS}/bin\"";
+    eval "export SCAN_BUILD=\"cov-build --dir cov-int\"";
+    cov-configure --comptype ${COV_COMPTYPE} --compiler ${CC} --template;
+  fi
+
+submit_to_coverity_scan: &submit_to_coverity_scan
+  if [ "${COVERITY_SCAN}" = "true" ]; then
+    tar -czf analysis-results.tgz cov-int &&
+    curl -s -S -F project="${TRAVIS_REPO_SLUG}"
+               -F token="${COVERITY_SCAN_TOKEN}"
+               -F file=@analysis-results.tgz
+               -F version=$(git rev-parse --short HEAD)
+               -F description="Travis CI build"
+               -F email="${COVERITY_SCAN_EMAIL:=cyclonedds-inbox@eclipse.org}"
+               "https://scan.coverity.com/builds";
+  fi
+
+linux_gcc8: &linux_gcc8
+  os: linux
+  dist: xenial
+  compiler: gcc
+  addons:
+    apt:
+      update: true
+      sources: [ ubuntu-toolchain-r-test ]
+      packages: [ gcc-8 g++-8 ]
+  before_install:
+    - eval "export CC=gcc-8"
+    - eval "export CXX=g++-8"
+    - eval "export COV_COMPTYPE=gcc COV_PLATFORM=linux64"
+  install:
+    - *install_coverity
+    - pip install conan --upgrade --user
+
+linux_clang: &linux_clang
+  os: linux
+  dist: xenial
+  compiler: clang
+  addons:
+    apt:
+      update: true
+  before_install:
+    - eval "export CC=clang"
+    - eval "export CXX=clang++"
+    - eval "export COV_COMPTYPE=clang COV_PLATFORM=linux64"
+  install:
+    - pip install conan --upgrade --user
+
+osx_xcode10_2: &osx_xcode10_2
+  os: osx
+  osx_image: xcode10.2
+  compiler: clang
+  addons:
+    homebrew:
+      packages:
+      - pyenv-virtualenv
+  before_install:
+    - eval "export CC=clang"
+    - eval "export CXX=clang++"
+    - eval "export COV_COMPTYPE=clang COV_PLATFORM=macOSX"
+  install:
+    - eval "$(pyenv init -)"
+    - pyenv virtualenv conan
+    - pyenv rehash
+    - pyenv activate conan
+    - pip install conan --upgrade
+
+windows_vs2017: &windows_vs2017
+  os: windows
+  # Conan will automatically determine the best compiler for a given platform
+  # based on educated guesses. The first check is based on the CC and CXX
+  # environment variables, the second (on Windows) is to check if Microsoft
+  # Visual Studio is installed. On Travis CC and CXX are set to gcc on
+  # Microsoft Windows targets as well, this has the undesired effect that MSVC
+  # is not detected, unsetting CC and CXX solves that problem.
+  #
+  #
+  # !!! IMPORTANT !!!
+  #
+  # Microsoft Windows instances freeze at "install:" if secure environment
+  # variables are used. There is no option to export secrets only for
+  # specified platforms. The "filter_secrets: false" option is used to disable
+  # the filter for Microsoft Windows instances. This is not an issue if the
+  # secret is removed from the environment at the earliest opportunity, before
+  # risk of exposure, as secrets are always removed from the environment for
+  # pull requests and are still filtered when exported to the environment. The
+  # secret of course will not be available for Microsoft Windows builds, but
+  # for Coverity Scan, that is fine.
+  filter_secrets: false
+  before_install:
+    - eval "unset COVERITY_SCAN_TOKEN"
+    - eval "unset COVERITY_SCAN_EMAIL"
+    - eval "unset CC"
+    - eval "unset CXX"
+    - eval "export COV_COMPTYPE=msvc COV_PLATFORM=win64"
+    - JAVA_HOME=$(find "/c/Program Files/Android/jdk/" -name "*openjdk*" | sort | head -n 1)
+    - export JAVA_HOME
+    - export PATH="${PATH}:${JAVA_HOME}/bin"
+  # Windows targets in Travis are still very much in beta and Python is not yet
+  # available and installation of Python through Chocolaty does not work well.
+  # The real fix is to wait until Python and pip are both available on the
+  # target. Until then download Conan from the official website and simply add
+  # the extracted folder to the path.
+  install:
+    - choco install innoextract
+    - choco install maven --ignore-dependencies
+    - wget -q https://dl.bintray.com/conan/installers/conan-win-64_1_10_0.exe
+    - innoextract conan-win-64_1_10_0.exe
+    - eval "export PATH=\"$(pwd)/app/conan:${PATH}\""
+
+jobs:
+  include:
+    - <<: *linux_gcc8
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Unix Makefiles", COVERITY_SCAN=true ]
+      if: type = cron
+    - <<: *linux_gcc8
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *linux_gcc8
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Release, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *linux_gcc8
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Debug, SSL=NO, GENERATOR="Unix Makefiles" ]
+    - <<: *linux_gcc8
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Release, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *linux_clang
+      env: [ ARCH=x86_64, ASAN=address, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *linux_clang
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Release, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *osx_xcode10_2
+      env: [ ARCH=x86_64, ASAN=address, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *osx_xcode10_2
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Release, SSL=YES, GENERATOR="Unix Makefiles" ]
+    - <<: *windows_vs2017
+      env: [ ARCH=x86, ASAN=none, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Visual Studio 15 2017" ]
+    - <<: *windows_vs2017
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Debug, SSL=YES, GENERATOR="Visual Studio 15 2017 Win64" ]
+    - <<: *windows_vs2017
+      env: [ ARCH=x86_64, ASAN=none, BUILD_TYPE=Release, SSL=YES, GENERATOR="Visual Studio 15 2017 Win64" ]
+
+before_script:
+  - conan profile new default --detect
+  - conan remote add bincrafters https://api.bintray.com/conan/bincrafters/public-conan
+
+script:
+  - mkdir build
+  - cd build
+  - conan install -b missing -s arch=${ARCH} -s build_type=${BUILD_TYPE} ..
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+          -DCMAKE_INSTALL_PREFIX=$(pwd)/install
+          -DUSE_SANITIZER=${ASAN}
+          -DENABLE_SSL=${SSL}
+          -DBUILD_TESTING=on
+          -DWERROR=on
+          -G "${GENERATOR}" ..
+  - case "${GENERATOR}" in
+      "Unix Makefiles")
+        ${SCAN_BUILD} cmake --build . --config ${BUILD_TYPE} --target install -- -j 4
+        ;;
+      "Visual Studio "*)
+        ${SCAN_BUILD} cmake --build . --config ${BUILD_TYPE} --target install -- -nologo -verbosity:minimal -maxcpucount -p:CL_MPCount=2
+        ;;
+      *)
+        ${SCAN_BUILD} cmake --build . --config ${BUILD_TYPE} --target install
+        ;;
+    esac
+  - CYCLONEDDS_URI='<CycloneDDS><Domain><Internal><EnableExpensiveChecks>all</EnableExpensiveChecks></Internal><Tracing><Verbosity>config</Verbosity><OutputFile>stderr</OutputFile></Tracing></Domain></CycloneDDS>' ctest -j 4 --output-on-failure -T test -C ${BUILD_TYPE}
+  - if [ "${ASAN}" != "none" ]; then
+      CMAKE_LINKER_FLAGS="-DCMAKE_LINKER_FLAGS=-fsanitize=${USE_SANITIZER}";
+      CMAKE_C_FLAGS="-DCMAKE_C_FLAGS=-fsanitize=${USE_SANITIZER}";
+    fi
+  - mkdir install/share/CycloneDDS/examples/helloworld/build
+  - cd install/share/CycloneDDS/examples/helloworld/build
+  - cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+          ${CMAKE_C_FLAGS}
+          ${CMAKE_LINKER_FLAGS}
+          -G "${GENERATOR}" ..
+  - cmake --build . --config ${BUILD_TYPE}
+  - cd "${TRAVIS_BUILD_DIR}/build"
+
+after_success:
+  - *submit_to_coverity_scan
+
