@@ -3,7 +3,7 @@ tracks:
     actions:
     - bloom-export-upstream :{vcs_local_uri} :{vcs_type} --tag :{release_tag} --display-uri
       :{vcs_uri} --name :{name} --output-dir :{archive_dir_path}
-    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 0.1.0+osrf202@gb421e10
+    - git-bloom-import-upstream :{archive_path} :{patches} --release-version 0.1.0+osrf278@g76fa688
       --replace
     - git-bloom-generate -y rosrelease :{ros_distro} --source upstream -i :{release_inc}
     - git-bloom-generate -y rosdebian --prefix release/:{ros_distro} :{ros_distro}
@@ -13,13 +13,13 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
     devel_branch: master
-    last_release: b421e1039ffb08eada3a9b75f3c6a581a41962c4
+    last_release: 76fa68808682a15dd8aff26da20622ac574fa1a1
     last_version: 0.1.0
     name: cyclonedds
-    patches: dashing
+    patches: null
     release_inc: '1'
     release_repo_url: https://github.com/ros2-gbp/cyclonedds-release.git
-    release_tag: b421e1039ffb08eada3a9b75f3c6a581a41962c4
+    release_tag: 76fa68808682a15dd8aff26da20622ac574fa1a1
     ros_distro: dashing
     vcs_type: git
     vcs_uri: https://github.com/eclipse-cyclonedds/cyclonedds.git
