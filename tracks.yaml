@@ -42,7 +42,7 @@ tracks:
     last_version: 0.1.0
     name: cyclonedds
     patches: null
-    release_inc: '4'
+    release_inc: '5'
     release_repo_url: https://github.com/ros2-gbp/cyclonedds-release.git
     release_tag: ff79941aeb2fdeee9f833aedc6adebb8a6e3ef72
     ros_distro: eloquent
