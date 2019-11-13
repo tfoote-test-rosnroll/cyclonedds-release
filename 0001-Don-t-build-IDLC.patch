@@ -1,7 +1,7 @@
-From 4ab17626d69f3d36b279d6a64918e757701b0c05 Mon Sep 17 00:00:00 2001
+From 7e7fd45065de721e3ef2b7159a2bdf23225a8979 Mon Sep 17 00:00:00 2001
 From: Michael Carroll <michael@openrobotics.org>
 Date: Wed, 23 Oct 2019 22:47:46 -0500
-Subject: [PATCH] Don't build IDLC
+Subject: [PATCH 1/2] Don't build IDLC
 
 ---
  debian/rules.em | 4 +++-
@@ -23,5 +23,5 @@ index aa010fa..d8f2309 100755
  override_dh_auto_build:
  	# In case we're installing to a non-standard location, look for a setup.sh
 -- 
-2.20.1
+2.23.0
 
