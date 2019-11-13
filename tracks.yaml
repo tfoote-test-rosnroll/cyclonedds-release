@@ -38,11 +38,11 @@ tracks:
     - git-bloom-generate -y rosrpm --prefix release/:{ros_distro} :{ros_distro} -i
       :{release_inc}
     devel_branch: master
-    last_release: 76fa68808682a15dd8aff26da20622ac574fa1a1
+    last_release: ff79941aeb2fdeee9f833aedc6adebb8a6e3ef72
     last_version: 0.1.0
     name: cyclonedds
     patches: null
-    release_inc: '3'
+    release_inc: '4'
     release_repo_url: https://github.com/ros2-gbp/cyclonedds-release.git
     release_tag: ff79941aeb2fdeee9f833aedc6adebb8a6e3ef72
     ros_distro: eloquent
