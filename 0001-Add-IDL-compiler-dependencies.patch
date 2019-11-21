@@ -1,4 +1,4 @@
-From e77ff6c3ba76192787122f2b768abd2a81e8f443 Mon Sep 17 00:00:00 2001
+From 3f1c5dec77c2682f9684a572ee7b1c2cf25aefa4 Mon Sep 17 00:00:00 2001
 From: Scott K Logan <logans@cottsay.net>
 Date: Thu, 14 Nov 2019 10:38:52 -0800
 Subject: [PATCH] Add IDL compiler dependencies
@@ -35,5 +35,5 @@ index 9d0980d..5b4b661 100644
      <test_depend>libcunit-dev</test_depend>
      <doc_depend>python3-sphinx</doc_depend>
 -- 
-2.23.0
+2.20.1
 
